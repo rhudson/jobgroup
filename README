@@ -1,0 +1,96 @@
+= JobGroup -- Class for running a group of forked processes
+
+JobGroup is a class that can be used to run a collection of tasks in parallel.
+This class does NOT run on Windows as it depends on the Kernel.fork method.
+
+
+== Purpose
+
+This class was created so that multiple parts of a program can be run in parallel
+by cloning the current process.  At the time of creation, Ruby only supports
+green threads (non-native) which do not truly run in parallel.  This means that
+when running a multi-threaded Ruby program on a multi-CPU system, only a single
+processor/core can be used at a time.  This limitation can be overcome by
+executing code in a separate process.
+
+The JobGroup class works best when a task can be broken down into chunks that
+can then be handled independently by separate processes.  CPU intensive tasks
+like processing a number of large XML files or running a collection of reports
+can often be easily added as jobs to a JobGroup and run in parallel.  Since each
+job is run in a separate process there are no memory concurrency concerns.
+Depending on the application, however, there could be concurrency considerations
+regarding other system resources such as the file system.
+
+
+== Usage
+
+Jobs can be added to a JobGroup in the form of a code block:
+
+    message = "Hello World!"
+
+    jgroup = Techtrovert::JobGroup.new
+
+    # Add a job to the JobGroup
+    job_id = jgroup.add(message) do |m|
+      puts "  Job running.  PID: #{Process.pid}"
+      puts m
+      puts
+    end
+
+    # Execute all jobs in the JobGroup
+    jgroup.run
+
+
+... or a method:
+
+    def some_method
+      message = "Hello World!"
+
+      jgroup = Techtrovert::JobGroup.new
+
+      # Add a job to the JobGroup
+      job_id = jgroup.add(self.method(:print_message), message)
+
+      jgroup.run
+    end
+
+    def print_message(m)
+      puts "  Job running.  PID: #{Process.pid}"
+      puts m
+      puts
+    end
+
+
+After a job is run, the return value can be obtained from the JobGroup using the
+job id value returned from the JobGroup.add method:
+
+    job = jgroup.get_job(job_id)
+    p job.return_val
+
+
+The JobGroup.run method will raise any exceptions raised by a job.  This feature
+can be turned off like this:
+
+    # If this is true (default) then all jobs will be killed when one raises
+    # an exception.
+    jgroup.abort_on_exceptions = false
+
+    # The exception is still available via the JobGroup object
+    job = jgroup.get_job(job_id)
+    p job.exception if job.exception_thrown?
+
+
+
+== Tips
+
+  * Forking a process is much more system-intensive than creating a new thread.
+    In many situations it is advisable to keep the maximum number of concurrent
+    jobs to a small number (less than 10).
+
+  * Do not run a JobGroup from a process that uses a lot of memory.  When a
+    JobGroup is run it will fork the current process a number of times to handle
+    each job in parallel.  Each process that is forked will start off using the
+    same amount of memory as the parent which could cause problems if the parent
+    is a memory hog.  For memory intensive programs it is best if the parent
+    process uses a small amount of memory and the jobs that are run by the
+    JobGroup handle the memory intensive code.

@@ -13,12 +13,14 @@ class MainClass
 
     jgroup = Techtrovert::JobGroup.new
 
+    # Add a job to the JobGroup
     job_id = jgroup.add(message) do |m|
       puts "  Job running.  PID: #{Process.pid}"
       puts m
       puts
     end
 
+    # Execute all jobs in the JobGroup
     jgroup.run
 
   end
